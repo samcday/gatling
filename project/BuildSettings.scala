@@ -16,7 +16,7 @@ object BuildSettings {
 		organization          := "io.gatling",
 		organizationHomepage  := Some(new URL("http://gatling.io")),
 		startYear             := Some(2011),
-		licenses              := Seq("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.html")),
+		licenses              := Seq("Apache-2.0" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.html")),
 		scalaVersion          := "2.10.4",
 		resolvers             := Seq(sonatypeSnapshots, Resolver.mavenLocal),
 		scalacOptions         := Seq(
@@ -38,7 +38,7 @@ object BuildSettings {
             "-Ywarn-numeric-widen",
             "-Ywarn-value-discard"*/
 		)
-	) ++ Publish.settings ++ Release.settings
+	) ++ bintray.Plugin.bintraySettings ++ Publish.settings ++ Release.settings
 
 	lazy val gatlingModuleSettings =
 		basicSettings ++ formattingSettings ++ graphSettings

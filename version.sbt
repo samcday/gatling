@@ -1,1 +1,1 @@
-version in ThisBuild := "2.0.0-confstats.1"
+version in ThisBuild := "2.0.0-confstats.3"

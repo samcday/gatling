@@ -30,7 +30,7 @@ import io.gatling.http.ahc.{ HttpEngine, WebSocketTx }
 
 class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
 
-  def logRequest(session: Session, requestName: String, status: Status, started: Long, ended: Long, errorMessage: Option[String] = None) {
+  private def logRequest(session: Session, requestName: String, status: Status, started: Long, ended: Long, errorMessage: Option[String] = None) {
     writeRequestData(
       session,
       requestName,
@@ -54,7 +54,7 @@ class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
     logRequest(session, requestName, OK, started, nowMillis)
   }
 
-  def webSocketOpen(webSocket: WebSocket, tx: WebSocketTx): Receive = {
+  def webSocketOpenState(webSocket: WebSocket, tx: WebSocketTx): Receive = {
     case OnMessage(message) =>
       // TODO deal with messages
       logger.debug(s"Received message on websocket '$wsName':$message")
@@ -72,36 +72,36 @@ class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
       webSocket.close
       logRequest(session, requestName, OK, started, nowMillis)
       next ! session.remove(wsName)
-      context.become(closing)
+      context.become(closingState)
 
     case OnUnexpectedClose | OnClose =>
       if (tx.protocol.wsPart.reconnect)
         if (tx.protocol.wsPart.maxReconnects.map(_ > tx.reconnectCount).getOrElse(true))
-          context.become(disconnected(Queue.empty[WebSocketMessage], tx))
+          context.become(disconnectedState(Queue.empty[WebSocketMessage], tx))
         else
-          context.become(pendingErrorMessage(s"Websocket '$wsName' was unexpectedly closed and max reconnect reached"))
+          context.become(pendingErrorMessageState(s"Websocket '$wsName' was unexpectedly closed and max reconnect reached"))
 
       else
-        context.become(pendingErrorMessage(s"Websocket '$wsName' was unexpectedly closed"))
+        context.become(pendingErrorMessageState(s"Websocket '$wsName' was unexpectedly closed"))
 
     case OnError(t) =>
-      context.become(pendingErrorMessage(s"Websocket '$wsName' gave an error: '${t.getMessage}'"))
+      context.become(pendingErrorMessageState(s"Websocket '$wsName' gave an error: '${t.getMessage}'"))
   }
 
-  def closing: Receive = {
+  def closingState: Receive = {
     case OnClose => context.stop(self)
   }
 
-  def disconnected(pendingSendMessages: Queue[WebSocketMessage], tx: WebSocketTx): Receive = {
+  def disconnectedState(pendingSendMessages: Queue[WebSocketMessage], tx: WebSocketTx): Receive = {
 
     case message: WebSocketMessage =>
       // reconnect on first client message tentative
       HttpEngine.instance.startWebSocketTransaction(tx.copy(reconnectCount = tx.reconnectCount + 1), self)
 
-      context.become(reconnecting(pendingSendMessages += message))
+      context.become(reconnectingState(pendingSendMessages += message))
   }
 
-  def reconnecting(pendingSendMessages: Queue[WebSocketMessage]): Receive = {
+  def reconnectingState(pendingSendMessages: Queue[WebSocketMessage]): Receive = {
 
     case message: WebSocketMessage =>
       pendingSendMessages += message
@@ -110,7 +110,7 @@ class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
       // send all pending messages
       pendingSendMessages.foreach { self ! _ }
 
-      context.become(webSocketOpen(webSocket, tx))
+      context.become(webSocketOpenState(webSocket, tx))
 
     case OnFailedOpen(tx, message, _, _) =>
 
@@ -119,10 +119,10 @@ class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
       // send all pending messages
       pendingSendMessages.foreach { self ! _ }
 
-      context.become(pendingErrorMessage(error))
+      context.become(pendingErrorMessageState(error))
   }
 
-  def pendingErrorMessage(error: String): Receive = {
+  def pendingErrorMessageState(error: String): Receive = {
 
       def flushPendingError(requestName: String, next: ActorRef, session: Session) {
         val now = nowMillis
@@ -148,7 +148,7 @@ class WebSocketActor(wsName: String) extends BaseActor with DataWriterClient {
       import tx._
       logRequest(session, requestName, OK, started, ended)
       next ! session.set(wsName, self)
-      context.become(webSocketOpen(webSocket, tx))
+      context.become(webSocketOpenState(webSocket, tx))
 
     case OnFailedOpen(tx, message, started, ended) =>
       import tx._

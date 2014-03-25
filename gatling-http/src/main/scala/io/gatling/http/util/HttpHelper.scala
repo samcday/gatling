@@ -34,6 +34,7 @@ object HttpHelper extends StrictLogging {
   val httpsScheme = "https"
   val wsScheme = "ws"
   val wssScheme = "wss"
+  val OkCodes = Vector(200, 304, 201, 202, 203, 204, 205, 206, 207, 208, 209)
 
   def parseFormBody(body: String): List[(String, String)] = {
       def utf8Decode(s: String) = URLDecoder.decode(s, UTF8.name)
@@ -61,6 +62,7 @@ object HttpHelper extends StrictLogging {
 
   def isCss(headers: FluentCaseInsensitiveStringsMap) = Option(headers.getFirstValue(HeaderNames.CONTENT_TYPE)).exists(_.contains(HeaderValues.TEXT_CSS))
   def isHtml(headers: FluentCaseInsensitiveStringsMap) = Option(headers.getFirstValue(HeaderNames.CONTENT_TYPE)).exists(ct => ct.contains(HeaderValues.TEXT_HTML) || ct.contains(HeaderValues.APPLICATION_XHTML))
+  def isAjax(headers: FluentCaseInsensitiveStringsMap) = Option(headers.getFirstValue(HeaderNames.X_REQUESTED_WITH)).exists(ct => ct.contains(HeaderValues.XML_HTTP_REQUEST))
   def resolveFromURI(rootURI: URI, relative: String) = AsyncHttpProviderUtils.getRedirectUri(rootURI, relative)
   def resolveFromURISilently(rootURI: URI, relative: String): Option[URI] =
     try {
